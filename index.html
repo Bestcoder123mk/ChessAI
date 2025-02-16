@@ -26,14 +26,25 @@
             margin-bottom: 10px;
         }
 
-        #board-container {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            gap: 20px;
-            margin: 20px auto;
-            max-width: 800px;
-        }
+#board-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 20px;
+    margin: 20px auto;
+    max-width: 1000px; /* Adjusted for better spacing */
+}
+
+#info {
+    order: -1; /* Moves the info div to the left */
+    width: 200px;
+    padding: 15px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    text-align: left;
+}
+
 
         #board {
             width: 400px;
@@ -45,7 +56,7 @@
         }
 
         #move-history {
-            width: 200px;
+            width: 150px;
             padding: 15px;
             border-radius: 10px;
             background: rgba(255, 255, 255, 0.8);
@@ -97,16 +108,6 @@
         #gameStatus:empty {
             display: none;
         }
-
-        #info {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.8);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            display: inline-block;
-        }
-
         @media (max-width: 600px) {
             #board-container {
                 flex-direction: column;
@@ -132,23 +133,15 @@
                 width: 200px;
             }
         }
+        .square-55d63 {
+    transition: background-color 0.2s ease-in-out;
+    }
+
     </style>
 </head>
 <body>
     <h2>Chess AI</h2>
-    <div id="board-container">
-        <div id="board"></div>
-        <div id="move-history">
-            <h3>Move History</h3>
-            <ul id="move-list"></ul>
-        </div>
-    </div>
-    <button id="gamestartBtn">Play With A Computer</button>
-    <p id="gameStatus" style="font-size: 18px; font-weight: bold; color: red;"></p>
-    <button id="restartBtn">Restart Game</button>
-    <button id="startBtn">Start Position</button>
-    <button id="clearBtn">Clear Board</button>
-    <p id="move-analysis">Move Analysis: -</p>
+<div id="board-container">
     <div id="info">
         <button id="bestMoveBtn">Find Best Move</button>
         <p id="best-move">Best Move: -</p>
@@ -162,19 +155,33 @@
         <button id="analyzeGame">Analyze Game</button>
     </div>
 
+    <div id="board"></div>
 
+    <div id="move-history">
+        <h3>Move History</h3>
+        <ul id="move-list"></ul>
+    </div>
+</div>
+    <button id="gamestartBtn">Play With A Computer</button>
+    <p id="gameStatus" style="font-size: 18px; font-weight: bold; color: red;"></p>
+    <button id="restartBtn">Restart Game</button>
+    <button id="startBtn">Start Position</button>
+    <button id="clearBtn">Clear Board</button>
+    <p id="move-analysis">Move Analysis: -</p>
     <script>
         let board, game, moves, currentMoveIndex;
         
         document.addEventListener("DOMContentLoaded", () => {
             game = new Chess();
             board = Chessboard('board', {
-                draggable: true,
-                position: 'start',
-                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-                onDrop: onDrop,
-                onSnapEnd: onSnapEnd
-            });
+            draggable: true,
+            position: 'start',
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
+            onMouseoverSquare: onMouseoverSquare,
+            onMouseoutSquare: onMouseoutSquare
+        });
         });
 
         document.getElementById("startBtn").addEventListener("click", () => {
@@ -234,7 +241,7 @@
         const style = document.createElement('style');
         style.innerHTML = `
             .highlight {
-                background-color: rgba(255, 215, 0, 0.7) !important; /* Gold color */
+                background-color: 	rgb(0, 255, 255) !important; 
             }
         `;
         document.head.appendChild(style);
@@ -337,7 +344,7 @@
         if (!response.ok) throw new Error("Failed to get analysis");
 
         const data = await response.json();
-        console.log("Stockfish API Response:", data);  // 🔥 Debugging: See the full response
+        console.log("Stockfish API Response:", data);
 
         if (!data.success || !data.bestmove) {
             console.error("Stockfish did not return a valid best move.");
@@ -407,45 +414,64 @@
         document.getElementById("move-analysis").innerText = "Error fetching move data";
     }
 }
-                function updateMoveHistory() {
-            const history = game.history();
-            const moveList = document.getElementById("moves");
-            moveList.innerHTML = "";
-            history.forEach((move, index) => {
-                moveList.innerHTML += `<p> ${index + 1}. ${move} </p>`;
-            });
-        }
+function updateMoveHistory() {
+    const moveList = document.getElementById("move-list");
+    moveList.innerHTML = ""; // Clear previous moves
 
-        function play() { 
-            game.reset();
-            board.position('start');
-            function onDragStart(source, piece, position, orientation) {
+    const history = game.history();
+    history.forEach((move, index) => {
+        const li = document.createElement("li");
+        li.textContent = `${index + 1}. ${move}`;
+        moveList.appendChild(li);
+    });
+}
+let stopAI = false; // Flag to control AI play
+
+function play() { 
+    stopAI = false; // Ensure AI is enabled when Play is pressed
+    game.reset();
+    board.position('start');
+
+    function onDragStart(source, piece, position, orientation) {
         if (game.game_over()) return false;
         if (piece.search(/^b/) !== -1) return false;
+    }
+
+    async function makeBestMove() {
+        if (game.game_over() || stopAI) return; // Stop AI if disabled
+
+        const fen = game.fen();
+        const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Failed to get AI move");
+
+            const data = await response.json();
+            if (data.success && data.bestmove) {
+                const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "e2e4")
+                game.move(bestMove);
+                board.position(game.fen());
+                updateMoveHistory();
+                checkGameStatus();
+            }
+        } catch (error) {
+            console.error("Error making AI move:", error);
         }
-
-            function makeRandomMove() {
-        if (game.game_over()) return; // Stop if game is over
-
-        var possibleMoves = game.moves();
-        if (possibleMoves.length === 0) return;
-
-        var randomIdx = Math.floor(Math.random() * possibleMoves.length);
-        game.move(possibleMoves[randomIdx]);
-        board.position(game.fen());
-
-        checkGameStatus();  // ✅ Check after AI move
     }
 
     function onDrop(source, target) {
+        if (stopAI) return; // Allow manual play without AI interference
+
         var move = game.move({ from: source, to: target, promotion: 'q' });
 
         if (move === null) return 'snapback';
 
-        checkGameStatus();  // ✅ Check after player move
+        updateMoveHistory();
+        checkGameStatus();
 
         if (!game.game_over()) {
-            window.setTimeout(makeRandomMove, 250);
+            setTimeout(makeBestMove, 500); // AI move with delay
         }
     }
 
@@ -462,7 +488,7 @@
         } else if (game.in_draw()) {
             statusElement.innerText = "It's a Draw!";
         } else {
-            statusElement.innerText = ""; // Clear status if the game continues
+            statusElement.innerText = "";
         }
     }
 
@@ -479,70 +505,59 @@
     document.getElementById("restartBtn").addEventListener("click", () => {
         game.reset();
         board.position('start');
-        document.getElementById("gameStatus").innerText = ""; // Clear status message
+        document.getElementById("gameStatus").innerText = "";
+        updateMoveHistory();
     });
-            updateMoveHistory();
-        }
 
-        function removeGreySquares() {
-            $('#board .square-55d63').css('background', '');
-        }
+    updateMoveHistory();
+}
 
-        function greySquare(square) {
-            var $square = $('#board .square-' + square);
+// Stop AI function
+function stopAIPlay() {
+    stopAI = true;
+}
 
-            var background = whiteSquareGrey;
-            if ($square.hasClass('black-3c85d')) {
-                background = blackSquareGrey;
-            }
+// Add a button to stop AI play
+document.addEventListener("DOMContentLoaded", () => {
+    const stopBtn = document.createElement("button");
+    stopBtn.id = "stopAIBtn";
+    stopBtn.innerText = "Stop AI";
+    stopBtn.onclick = stopAIPlay;
+    document.body.appendChild(stopBtn);
+});
+       function onMouseoverSquare(square) {
+    const moves = game.moves({
+        square: square,
+        verbose: true
+    });
 
-            $square.css('background', background);
-        }
+    if (moves.length === 0) return;
 
-        function onDragStart(source, piece) {
-            if (game.game_over()) return false;
+    // Highlight selected square
+    highlightSquare(square, "rgba(255, 255, 0, 0.6)"); // Yellow highlight
 
-            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
-                (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
-                return false;
-            }
-        }
+    // Highlight all possible move destinations
+    moves.forEach(move => {
+        highlightSquare(move.to, "rgba(0, 255, 0, 0.6)"); // Green highlight
+    });
+}
 
-        function onDrop(source, target) {
-            removeGreySquares();
+function onMouseoutSquare(square) {
+    removeHighlighting();
+}
 
-            var move = game.move({
-                from: source,
-                to: target,
-                promotion: 'q' // Promote to a queen by default
-            });
+function highlightSquare(square, color) {
+    const squareElement = document.querySelector(`.square-${square}`);
+    if (squareElement) {
+        squareElement.style.backgroundColor = color;
+    }
+}
 
-            if (move === null) return 'snapback';
-
-            board.position(game.fen());
-            updateMoveHistory();
-            makeAIMove();
-            checkGameStatus();
-        }
-
-        function onMouseoverSquare(square) {
-            var moves = game.moves({
-                square: square,
-                verbose: true
-            });
-
-            if (moves.length === 0) return;
-
-            greySquare(square);
-
-            for (var i = 0; i < moves.length; i++) {
-                greySquare(moves[i].to);
-            }
-        }
-
-        function onMouseoutSquare(square) {
-            removeGreySquares();
-        }
+function removeHighlighting() {
+    document.querySelectorAll("#board .square-55d63").forEach(square => {
+        square.style.backgroundColor = "";
+    });
+}
 
         function onSnapEnd() {
             board.position(game.fen());
