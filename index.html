@@ -358,13 +358,6 @@ function play() {
         if (game.game_over()) return false;
         if (piece.search(/^b/) !== -1) return false;
     }
-    let stopPlaying = false; // Flag to control AI movement
-
-function stopComputerPlay() {
-    stopPlaying = true;
-    document.getElementById("gameStatus").innerText = "Computer stopped playing!";
-}
-
     function makeRandomMove() {
         if (game.game_over()) return; // Stop if game is over
 
@@ -375,20 +368,43 @@ function stopComputerPlay() {
         game.move(possibleMoves[randomIdx]);
         board.position(game.fen());
 
-        checkGameStatus();  // ✅ Check after AI move
+        checkGameStatus();  
     }
+    function makeBestMove() {
+    if (game.game_over()) return; // Stop if game is over
+
+    let stockfish = new Worker("stockfish.js"); // Initialize Stockfish engine
+
+    stockfish.postMessage("position fen " + game.fen()); // Set the board position
+    stockfish.postMessage("go depth 15"); // Ask for the best move with a depth of 15
+
+    stockfish.onmessage = function (event) {
+        let message = event.data;
+        
+        if (message.startsWith("bestmove")) {
+            let bestMove = message.split(" ")[1]; // Extract the best move
+            game.move({ from: bestMove.substring(0, 2), to: bestMove.substring(2, 4), promotion: 'q' });
+            
+            board.position(game.fen()); // Update the board
+            checkGameStatus(); // Check if the game is over
+            
+            stockfish.terminate(); // Stop Stockfish
+        }
+    };
+}
 
     function onDrop(source, target) {
-        if (stopPlaying) return;
         var move = game.move({ from: source, to: target, promotion: 'q' });
         if (move === null) return 'snapback';
 
-        checkGameStatus();  // ✅ Check after player move
+        checkGameStatus();  
 
         if (!game.game_over()) {
-            window.setTimeout(makeRandomMove, 250);
-        }
+        var pickBestMove = Math.random() < 0.5; 
+
+        window.setTimeout(pickBestMove ? makeBestMove : makeRandomMove, 250);
     }
+}
 
     function onSnapEnd() {
         board.position(game.fen());
