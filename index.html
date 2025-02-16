@@ -328,47 +328,92 @@
             }
         }
 
-        async function analyzeCurrentMove() {
-            const fen = game.fen();
-            const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
+ async function analyzeCurrentMove() {
+    const fen = game.fen();
+    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
 
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Failed to get analysis");
-                
-                const data = await response.json();
-                if (!data.success || !data.bestmove) {
-                    document.getElementById("move-analysis").innerText = "No analysis available";
-                    return;
-                }
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to get analysis");
 
-                let bestMove = data.bestmove.trim().split(" ")[0] || "N/A";
-                let evalScore = data.evaluation ? parseFloat(data.evaluation) : 0;
+        const data = await response.json();
+        console.log("Stockfish API Response:", data);  // 🔥 Debugging: See the full response
 
-                const playerMove = moves[currentMoveIndex - 1]?.san || "None";
+        if (!data.success || !data.bestmove) {
+            console.error("Stockfish did not return a valid best move.");
+            document.getElementById("move-analysis").innerText = "No analysis available";
+            return;
+        }
 
-                let moveCategory = "Good Move", moveColor = "black";
-                if (playerMove === bestMove) {
-                    moveCategory = "Best Move"; moveColor = "green";
-                } else if (evalScore >= 2.5) {
-                    moveCategory = "Brilliant Move"; moveColor = "cyan";
-                } else if (evalScore >= 1.5) {
-                    moveCategory = "Great Move"; moveColor = "indigo";
-                } else if (evalScore >= 0.8) {
-                    moveCategory = "Inaccuracy"; moveColor = "#FFCE1B";
-                } else if (evalScore >= 3.0) {
-                    moveCategory = "Blunder"; moveColor = "red";
-                }
+        const bestMove = data.bestmove.split(" ")[1] || "N/A";  // Extract Stockfish's best move
+        const evalScore = parseFloat(data.evaluation || "0");  // Ensure evaluation is a number
 
-                document.getElementById("move-analysis").innerHTML = 
-                    `<strong>${moveCategory}:</strong> ${playerMove} <br>
-                     Stockfish Suggestion: <strong>${bestMove}</strong> <br> 
-                     Eval: <strong>${evalScore}</strong>`;
-                document.getElementById("move-analysis").style.color = moveColor;
-            } catch (error) {
-                console.error("Error analyzing move:", error);
-                document.getElementById("move-analysis").innerText = "Error fetching move data";
-            }
+        console.log(`Best Move: ${bestMove}, Evaluation: ${evalScore}`);  // Debugging logs
+
+        // Get the player's move
+        const playerMove = moves[currentMoveIndex - 1]?.san || "None";
+
+        let moveCategory = "Good Move"; // Default label
+        let moveColor = "black"; // Default color
+
+        // Chess.com-style Move Categorization
+        const evalThresholds = {
+            brilliant: 2.5,  // Sacrifice & best move
+            great: 2.0,  // Best move but not a sacrifice
+            book: 0.0,   // Opening moves
+            inaccuracy: 0.8,  // Small mistake
+            mistake: 1.5, // Medium mistake
+            blunder: 3.0  // Huge mistake
+        };
+
+        if (playerMove === bestMove) {
+            moveCategory = "Best Move";
+            moveColor = "green";
+        } 
+        else if (Math.abs(evalScore) <= evalThresholds.book) {
+            moveCategory = "Book Move";
+            moveColor = "gray";
+        } 
+        else if (Math.abs(evalScore) > evalThresholds.brilliant && playerMove !== bestMove) {
+            moveCategory = "Brilliant Move";
+            moveColor = "cyan";
+        } 
+        else if (Math.abs(evalScore) > evalThresholds.great && playerMove !== bestMove) {
+            moveCategory = "Great Move";
+            moveColor = "indigo";
+        } 
+        else if (Math.abs(evalScore) > evalThresholds.inaccuracy && Math.abs(evalScore) < evalThresholds.mistake) {
+            moveCategory = "Inaccuracy";
+            moveColor = "#FFCE1B";
+        } 
+        else if (Math.abs(evalScore) > evalThresholds.mistake && Math.abs(evalScore) < evalThresholds.blunder) {
+            moveCategory = "Mistake";
+            moveColor = "orange";
+        } 
+        else if (Math.abs(evalScore) > evalThresholds.blunder) {
+            moveCategory = "Blunder";
+            moveColor = "red";
+        }
+
+        // Display Move Analysis
+        const moveInfo = document.getElementById("move-analysis");
+        moveInfo.innerHTML = `<strong>${moveCategory}:</strong> ${playerMove} <br> 
+                              Stockfish Suggestion: <strong>${bestMove}</strong> <br> 
+                              Eval: <strong>${evalScore}</strong>`;
+        moveInfo.style.color = moveColor;
+
+    } catch (error) {
+        console.error("Error analyzing position:", error);
+        document.getElementById("move-analysis").innerText = "Error fetching move data";
+    }
+}
+                function updateMoveHistory() {
+            const history = game.history();
+            const moveList = document.getElementById("moves");
+            moveList.innerHTML = "";
+            history.forEach((move, index) => {
+                moveList.innerHTML += `<p> ${index + 1}. ${move} </p>`;
+            });
         }
 
         function play() { 
@@ -377,9 +422,9 @@
             function onDragStart(source, piece, position, orientation) {
         if (game.game_over()) return false;
         if (piece.search(/^b/) !== -1) return false;
-    }
+        }
 
-    function makeRandomMove() {
+            function makeRandomMove() {
         if (game.game_over()) return; // Stop if game is over
 
         var possibleMoves = game.moves();
