@@ -155,21 +155,25 @@ input, select {
         document.getElementById("gamestartBtn").addEventListener("click", play);
         
         async function analyzeWithStockfish() {
-    const fen = game.fen();  // Get current board position in FEN format
+    const fen = game.fen();
     const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
-
-    console.log("Sending request to Stockfish API:", url); // Debugging log
 
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error("Failed to get analysis");
 
         const data = await response.json();
-        console.log("Stockfish API Response:", data);  // Debugging log
-
         if (data.success && data.bestmove) {
-            // Extract best move from the response
-            const bestMove = data.bestmove.split(" ")[1]; // Extract move (e.g., "b7b6")
+            const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "b7b6")
+
+            if (bestMove.length === 4) {
+                const fromSquare = bestMove.substring(0, 2);
+                const toSquare = bestMove.substring(2, 4);
+
+                // Highlight squares on the board
+                highlightMove(fromSquare, toSquare);
+            }
+
             document.getElementById("best-move").innerText = `Best Move: ${bestMove} (Eval: ${data.evaluation})`;
         } else {
             document.getElementById("best-move").innerText = "Best Move: No data available";
@@ -179,6 +183,26 @@ input, select {
         document.getElementById("best-move").innerText = "Best Move: Error fetching move";
     }
 }
+
+// Function to highlight the best move
+function highlightMove(from, to) {
+    // Remove previous highlights
+    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+
+    // Add new highlights
+    document.querySelector(`.square-${from}`).classList.add('highlight');
+    document.querySelector(`.square-${to}`).classList.add('highlight');
+}
+
+// Add CSS styles for highlight effect
+const style = document.createElement('style');
+style.innerHTML = `
+    .highlight {
+        background-color: rgba(255, 215, 0, 0.7) !important; /* Gold color */
+    }
+`;
+document.head.appendChild(style);
+
 
 
 
@@ -278,87 +302,128 @@ input, select {
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error("Failed to get analysis");
-
+        
         const data = await response.json();
-        console.log("Stockfish API Response:", data);  // 🔥 Debugging: See the full response
-
         if (!data.success || !data.bestmove) {
-            console.error("Stockfish did not return a valid best move.");
             document.getElementById("move-analysis").innerText = "No analysis available";
             return;
         }
 
-        const bestMove = data.bestmove.split(" ")[1] || "N/A";  // Extract Stockfish's best move
-        const evalScore = parseFloat(data.evaluation || "0");  // Ensure evaluation is a number
+        let bestMove = data.bestmove.trim().split(" ")[0] || "N/A";
+        let evalScore = data.evaluation ? parseFloat(data.evaluation) : 0;
 
-        console.log(`Best Move: ${bestMove}, Evaluation: ${evalScore}`);  // Debugging logs
-
-        // Get the player's move
         const playerMove = moves[currentMoveIndex - 1]?.san || "None";
 
-        let moveCategory = "Good Move"; // Default label
-        let moveColor = "black"; // Default color
-
-        // Chess.com-style Move Categorization
-        const evalThresholds = {
-            brilliant: 2.5,  // Sacrifice & best move
-            great: 2.0,  // Best move but not a sacrifice
-            book: 0.0,   // Opening moves
-            inaccuracy: 0.8,  // Small mistake
-            mistake: 1.5, // Medium mistake
-            blunder: 3.0  // Huge mistake
-        };
-
+        let moveCategory = "Good Move", moveColor = "black";
         if (playerMove === bestMove) {
-            moveCategory = "Best Move";
-            moveColor = "green";
-        } 
-        else if (Math.abs(evalScore) <= evalThresholds.book) {
-            moveCategory = "Book Move";
-            moveColor = "gray";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.brilliant && playerMove !== bestMove) {
-            moveCategory = "Brilliant Move";
-            moveColor = "cyan";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.great && playerMove !== bestMove) {
-            moveCategory = "Great Move";
-            moveColor = "indigo";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.inaccuracy && Math.abs(evalScore) < evalThresholds.mistake) {
-            moveCategory = "Inaccuracy";
-            moveColor = "#FFCE1B";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.mistake && Math.abs(evalScore) < evalThresholds.blunder) {
-            moveCategory = "Mistake";
-            moveColor = "orange";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.blunder) {
-            moveCategory = "Blunder";
-            moveColor = "red";
+            moveCategory = "Best Move"; moveColor = "green";
+        } else if (evalScore >= 2.5) {
+            moveCategory = "Brilliant Move"; moveColor = "cyan";
+        } else if (evalScore >= 1.5) {
+            moveCategory = "Great Move"; moveColor = "indigo";
+        } else if (evalScore >= 0.8) {
+            moveCategory = "Inaccuracy"; moveColor = "#FFCE1B";
+        } else if (evalScore >= 3.0) {
+            moveCategory = "Blunder"; moveColor = "red";
         }
 
-        // Display Move Analysis
-        const moveInfo = document.getElementById("move-analysis");
-        moveInfo.innerHTML = `<strong>${moveCategory}:</strong> ${playerMove} <br> 
-                              Stockfish Suggestion: <strong>${bestMove}</strong> <br> 
-                              Eval: <strong>${evalScore}</strong>`;
-        moveInfo.style.color = moveColor;
-
+        document.getElementById("move-analysis").innerHTML = 
+            `<strong>${moveCategory}:</strong> ${playerMove} <br>
+             Stockfish Suggestion: <strong>${bestMove}</strong> <br> 
+             Eval: <strong>${evalScore}</strong>`;
+        document.getElementById("move-analysis").style.color = moveColor;
     } catch (error) {
-        console.error("Error analyzing position:", error);
+        console.error("Error analyzing move:", error);
         document.getElementById("move-analysis").innerText = "Error fetching move data";
     }
 }
-function play() {   
-    board = null;
-    game = new Chess();
 
-    function onDragStart(source, piece, position, orientation) {
-        if (game.game_over()) return false;
-        if (piece.search(/^b/) !== -1) return false;
+function play() { 
+    if (!board || !game) {
+        game = new Chess();
+        board = Chessboard('board', {
+            draggable: true,
+            position: 'start',
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd
+        });
+    } else {
+        game.reset();
+        board.position('start');
+    }
+    function removeGreySquares() {
+        $('#board .square-55d63').css('background', '');
     }
 
+    function greySquare(square) {
+        var $square = $('#board .square-' + square);
+
+        var background = whiteSquareGrey;
+        if ($square.hasClass('black-3c85d')) {
+            background = blackSquareGrey;
+        }
+
+        $square.css('background', background);
+    }
+
+    function onDragStart(source, piece) {
+        if (game.game_over()) return false;
+
+        if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+            (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+            return false;
+        }
+    }
+
+    function onDrop(source, target) {
+        removeGreySquares();
+
+        var move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q' // Promote to a queen by default
+        });
+
+        if (move === null) return 'snapback';
+    }
+
+    function onMouseoverSquare(square) {
+        var moves = game.moves({
+            square: square,
+            verbose: true
+        });
+
+        if (moves.length === 0) return;
+
+        greySquare(square);
+
+        for (var i = 0; i < moves.length; i++) {
+            greySquare(moves[i].to);
+        }
+    }
+
+    function onMouseoutSquare(square) {
+        removeGreySquares();
+    }
+
+    function onSnapEnd() {
+        board.position(game.fen());
+    }
+
+    var config = {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+        onMouseoutSquare: onMouseoutSquare,
+        onMouseoverSquare: onMouseoverSquare,
+        onSnapEnd: onSnapEnd
+    };
+}
+    document.addEventListener("DOMContentLoaded", () => {
+        board = Chessboard('board', config);
+    });
     function makeRandomMove() {
         if (game.game_over()) return; // Stop if game is over
 
@@ -371,23 +436,6 @@ function play() {
 
         checkGameStatus();  // ✅ Check after AI move
     }
-
-    function onDrop(source, target) {
-        var move = game.move({ from: source, to: target, promotion: 'q' });
-
-        if (move === null) return 'snapback';
-
-        checkGameStatus();  // ✅ Check after player move
-
-        if (!game.game_over()) {
-            window.setTimeout(makeRandomMove, 250);
-        }
-    }
-
-    function onSnapEnd() {
-        board.position(game.fen());
-    }
-
     function checkGameStatus() {
         const statusElement = document.getElementById("gameStatus");
 
@@ -400,15 +448,6 @@ function play() {
             statusElement.innerText = ""; // Clear status if the game continues
         }
     }
-
-    var config = {
-        draggable: true,
-        position: 'start',
-        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-        onDragStart: onDragStart,
-        onDrop: onDrop,
-        onSnapEnd: onSnapEnd
-    };
     board = Chessboard('board', config);
 
     document.getElementById("restartBtn").addEventListener("click", () => {
