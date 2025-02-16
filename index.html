@@ -350,94 +350,67 @@ input, select {
         document.getElementById("move-analysis").innerText = "Error fetching move data";
     }
 }
-function play() {   
-    board = null;
-    game = new Chess();
-
-    function onDragStart(source, piece, position, orientation) {
-        if (game.game_over()) return false;
-        if (piece.search(/^b/) !== -1) return false;
-    }
-
-    function makeRandomMove() {
-        if (game.game_over()) return; // Stop if game is over
-
-        var possibleMoves = game.moves();
-        if (possibleMoves.length === 0) return;
-
-        var randomIdx = Math.floor(Math.random() * possibleMoves.length);
-        game.move(possibleMoves[randomIdx]);
-        board.position(game.fen());
-
-        checkGameStatus();  // ✅ Check after AI move
-    }
-
-    function onDrop(source, target) {
-        var move = game.move({ from: source, to: target, promotion: 'q' });
-
-        if (move === null) return 'snapback';
-
-        checkGameStatus();  // ✅ Check after player move
-
-        if (!game.game_over()) {
-            window.setTimeout(makeRandomMove, 250);
-        }
-    }
-
-    function onSnapEnd() {
-        board.position(game.fen());
-    }
-
-    function checkGameStatus() {
-        const statusElement = document.getElementById("gameStatus");
-
-        if (game.in_checkmate()) {
-            let winner = game.turn() === 'w' ? 'Black' : 'White';
-            statusElement.innerText = `Checkmate! ${winner} Wins!`;
-        } else if (game.in_draw()) {
-            statusElement.innerText = "It's a Draw!";
-        } else {
-            statusElement.innerText = ""; // Clear status if the game continues
-        }
-    }
-
-    var config = {
-        draggable: true,
-        position: 'start',
-        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-        onDragStart: onDragStart,
-        onDrop: onDrop,
-        onSnapEnd: onSnapEnd
-    };
-    board = Chessboard('board', config);
-
-    document.getElementById("restartBtn").addEventListener("click", () => {
-        game.reset();
-        board.position('start');
-        document.getElementById("gameStatus").innerText = ""; // Clear status message
-    });
-}
 
     
-
-// Modify `navigateMoves()` to analyze each move
-function navigateMoves(direction) {
-    currentMoveIndex += direction;
-
-    if (currentMoveIndex < 0) currentMoveIndex = 0;
-    if (currentMoveIndex > moves.length) currentMoveIndex = moves.length;
-
-    game.reset();
-    for (let i = 0; i < currentMoveIndex; i++) {
-        game.move(moves[i].san);
+    function play() {
+        document.addEventListener("DOMContentLoaded", function () {
+    const boardElement = document.getElementById("chess-board");
+    let board, game, currentMoveIndex = 0;
+        game = new Chess();
+        if (board) board.destroy();
+        board = Chessboard("chess-board", {
+            draggable: true,
+            position: "start",
+            onDragStart: (source, piece) => {
+                if (game.game_over() || !piece || piece.startsWith('b')) return false;
+            },
+            onDrop: (source, target) => {
+                let move = game.move({ from: source, to: target, promotion: "q" });
+                if (!move) return 'snapback';
+                updateStatus();
+            }
+        });
+        updateStatus();
     }
-
-    board.position(game.fen());
-
-    // Analyze move with Stockfish
-    analyzeCurrentMove();
-}
-
-    </script>
+    
+    function updateStatus() {
+        document.getElementById("game-status").innerText = game.game_over() ? "Game Over" : "Game in Progress";
+    }
+    
+    async function analyzeWithStockfish() {
+        try {
+            let response = await fetch(`https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(game.fen())}`);
+            let data = await response.json();
+            let bestMove = data.bestmove?.split(" ")[1] || "No Move Found";
+            document.getElementById("game-status").innerText = `Best Move: ${bestMove}`;
+        } catch (error) {
+            document.getElementById("game-status").innerText = "Stockfish analysis failed.";
+        }
+    }
+    
+    function loadPastGame(pgn) {
+        try {
+            game.load_pgn(pgn);
+            board.position(game.fen());
+            updateStatus();
+        } catch (error) {
+            console.error("Error loading PGN:", error);
+        }
+    }
+    
+    function navigateMoves(direction) {
+        let moves = game.history();
+        if (direction === "prev" && currentMoveIndex > 0) currentMoveIndex--;
+        else if (direction === "next" && currentMoveIndex < moves.length - 1) currentMoveIndex++;
+        game.reset();
+        for (let i = 0; i <= currentMoveIndex; i++) game.move(moves[i]);
+        board.position(game.fen());
+    }
+    
+    document.getElementById("start-button").addEventListener("click", play);
+    document.getElementById("best-move-btn").addEventListener("click", analyzeWithStockfish);
+    document.getElementById("prev-move").addEventListener("click", () => navigateMoves("prev"));
+    document.getElementById("next-move").addEventListener("click", () => navigateMoves("next"));
+});
 </body>
 </html>
