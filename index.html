@@ -358,6 +358,12 @@ function play() {
         if (game.game_over()) return false;
         if (piece.search(/^b/) !== -1) return false;
     }
+    let stopPlaying = false; // Flag to control AI movement
+
+function stopComputerPlay() {
+    stopPlaying = true;
+    document.getElementById("gameStatus").innerText = "Computer stopped playing!";
+}
 
     function makeRandomMove() {
         if (game.game_over()) return; // Stop if game is over
@@ -373,8 +379,8 @@ function play() {
     }
 
     function onDrop(source, target) {
+        if (stopPlaying) return;
         var move = game.move({ from: source, to: target, promotion: 'q' });
-
         if (move === null) return 'snapback';
 
         checkGameStatus();  // ✅ Check after player move
@@ -416,6 +422,10 @@ function play() {
         board.position('start');
         document.getElementById("gameStatus").innerText = ""; // Clear status message
     });
+    const stopButton = document.createElement("button");
+stopButton.innerText = "Stop Playing";
+stopButton.onclick = stopComputerPlay;
+document.body.appendChild(stopButton);
 }
 
     
