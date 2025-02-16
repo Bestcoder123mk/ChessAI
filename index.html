@@ -358,36 +358,31 @@ function play() {
         if (game.game_over()) return false;
         if (piece.search(/^b/) !== -1) return false;
     }
-    function makeBestMove() {
-    if (game.game_over()) return;
 
-    let stockfish = new Worker("stockfish.js");
-    stockfish.postMessage("position fen " + game.fen()); 
-    stockfish.postMessage("go depth 15"); 
+    function makeRandomMove() {
+        if (game.game_over()) return; // Stop if game is over
 
-    stockfish.onmessage = function (event) {
-        let message = event.data;
-        
-        if (message.startsWith("bestmove")) {
-            let bestMove = message.split(" ")[1]; // Extract the best move
-            game.move({ from: bestMove.substring(0, 2), to: bestMove.substring(2, 4), promotion: 'q' });
-            
-            board.position(game.fen()); // Update the board
-            checkGameStatus(); // Check if the game is over
-            
-            stockfish.terminate(); // Stop Stockfish
-        }
-    };
-}
+        var possibleMoves = game.moves();
+        if (possibleMoves.length === 0) return;
+
+        var randomIdx = Math.floor(Math.random() * possibleMoves.length);
+        game.move(possibleMoves[randomIdx]);
+        board.position(game.fen());
+
+        checkGameStatus();  // ✅ Check after AI move
+    }
 
     function onDrop(source, target) {
         var move = game.move({ from: source, to: target, promotion: 'q' });
+
         if (move === null) return 'snapback';
-        checkGameStatus();  
+
+        checkGameStatus();  // ✅ Check after player move
+
         if (!game.game_over()) {
-        window.setTimeout(makeBestMove, 250);
+            window.setTimeout(makeRandomMove, 250);
+        }
     }
-}
 
     function onSnapEnd() {
         board.position(game.fen());
@@ -421,10 +416,6 @@ function play() {
         board.position('start');
         document.getElementById("gameStatus").innerText = ""; // Clear status message
     });
-    const stopButton = document.createElement("button");
-stopButton.innerText = "Stop Playing";
-stopButton.onclick = stopComputerPlay;
-document.body.appendChild(stopButton);
 }
 
     
