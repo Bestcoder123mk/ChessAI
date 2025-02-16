@@ -37,23 +37,24 @@
 
 #info {
     order: -1; /* Moves the info div to the left */
-    width: 200px;
+    width: 300px;
     padding: 15px;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.8);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    text-align: left;
+    text-align: center;
 }
 
 
-        #board {
-            width: 400px;
-            height: 400px;
-            border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            background-color: #fff;
-            padding: 10px;
-        }
+#board {
+    width: 400px;
+    height: 400px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    background-color: #fff;
+    padding: 10px;
+}
+
 
         #move-history {
             width: 150px;
@@ -153,6 +154,7 @@
             <option value="">Select a game</option>
         </select>
         <button id="analyzeGame">Analyze Game</button>
+        <p id="move-analysis">Move Analysis: -</p>
     </div>
 
     <div id="board"></div>
@@ -167,22 +169,81 @@
     <button id="restartBtn">Restart Game</button>
     <button id="startBtn">Start Position</button>
     <button id="clearBtn">Clear Board</button>
-    <p id="move-analysis">Move Analysis: -</p>
     <script>
-        let board, game, moves, currentMoveIndex;
-        
-        document.addEventListener("DOMContentLoaded", () => {
-            game = new Chess();
-            board = Chessboard('board', {
-            draggable: true,
-            position: 'start',
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd,
-            onMouseoverSquare: onMouseoverSquare,
-            onMouseoutSquare: onMouseoutSquare
-        });
-        });
+        let board, game, moves, currentMoveIndex, selectedSquare;
+
+document.addEventListener("DOMContentLoaded", () => {
+    game = new Chess();
+
+    function onDrop(source, target) {
+        if (stopAI) return; // Allow manual play without AI interference
+        var move = game.move({ from: source, to: target, promotion: 'q' });
+        if (move === null) return 'snapback';
+        updateMoveHistory();
+        checkGameStatus();
+        if (!game.game_over()) setTimeout(makeBestMove, 500); // AI move with delay
+    }
+
+    function onSquareClick(square) {
+        if (selectedSquare) {
+            // Attempt move
+            let move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+
+            if (move === null) {
+                selectedSquare = null;
+                removeHighlighting();
+                return;
+            }
+
+            board.position(game.fen());
+            updateMoveHistory();
+            removeHighlighting();
+            selectedSquare = null;
+
+            setTimeout(makeBestMove, 500); // AI Move
+        } else {
+            // Select piece
+            if (game.get(square)) {
+                selectedSquare = square;
+                highlightSquare(square, "highlight");
+
+                // Highlight possible moves
+                let moves = game.moves({ square: square, verbose: true });
+                moves.forEach(m => highlightSquare(m.to, "move-highlight"));
+            }
+        }
+    }
+
+    function onSnapEnd() {
+        board.position(game.fen());
+    }
+
+    function onMouseoverSquare(square) {
+        const moves = game.moves({ square: square, verbose: true });
+        if (moves.length === 0) return;
+        highlightSquare(square, "rgba(255, 255, 0, 0.6)"); // Highlight selected square
+        moves.forEach(move => highlightSquare(move.to, "rgba(0, 255, 0, 0.6)")); // Highlight legal moves
+    }
+
+    function onMouseoutSquare() {
+        removeHighlighting();
+    }
+
+    // Initialize Chessboard
+    board = Chessboard('board', {
+        draggable: true,
+        position: 'start',
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        onMouseoverSquare: onMouseoverSquare,
+        onMouseoutSquare: onMouseoutSquare,
+        onSquareClick: onSquareClick
+    });
+
+    console.log("Chessboard initialized successfully!"); // Debugging log
+});
+
 
         document.getElementById("startBtn").addEventListener("click", () => {
             game.reset();
@@ -335,7 +396,7 @@
             }
         }
 
- async function analyzeCurrentMove() {
+        async function analyzeCurrentMove() {
     const fen = game.fen();
     const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
 
@@ -352,52 +413,65 @@
             return;
         }
 
-        const bestMove = data.bestmove.split(" ")[1] || "N/A";  // Extract Stockfish's best move
-        const evalScore = parseFloat(data.evaluation || "0");  // Ensure evaluation is a number
+        const bestMove = data.bestmove.split(" ")[1] || "N/A"; // Extract Stockfish's best move
+        const evalScore = parseFloat(data.evaluation || "0"); // Ensure evaluation is a number
 
-        console.log(`Best Move: ${bestMove}, Evaluation: ${evalScore}`);  // Debugging logs
+        console.log(`Best Move: ${bestMove}, Evaluation: ${evalScore}`); // Debugging logs
 
         // Get the player's move
         const playerMove = moves[currentMoveIndex - 1]?.san || "None";
 
+        // Calculate material difference before and after the move
+        const materialBefore = calculateMaterial(game.fen());
+        game.undo(); // Undo the last move to check the previous position
+        const materialAfter = calculateMaterial(game.fen());
+        game.move(playerMove); // Redo the move
+
+        const materialDifference = materialAfter - materialBefore;
+
+        // Chess.com-style Move Categorization
         let moveCategory = "Good Move"; // Default label
         let moveColor = "black"; // Default color
 
-        // Chess.com-style Move Categorization
+        // Thresholds for move categorization
         const evalThresholds = {
-            brilliant: 2.5,  // Sacrifice & best move
-            great: 2.0,  // Best move but not a sacrifice
-            book: 0.0,   // Opening moves
-            inaccuracy: 0.8,  // Small mistake
+            brilliant: 2.5, // Sacrifice & best move
+            great: 2.0, // Best move but not a sacrifice
+            book: 0.0, // Opening moves
+            inaccuracy: 0.8, // Small mistake
             mistake: 1.5, // Medium mistake
-            blunder: 3.0  // Huge mistake
+            blunder: 3.0 // Huge mistake
         };
 
-        if (playerMove === bestMove) {
-            moveCategory = "Best Move";
-            moveColor = "green";
-        } 
-        else if (Math.abs(evalScore) <= evalThresholds.book) {
-            moveCategory = "Book Move";
-            moveColor = "gray";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.brilliant && playerMove !== bestMove) {
+        // Check if the move is the best move
+        const isBestMove = playerMove === bestMove;
+
+        // Check if the move involves a sacrifice
+        const isSacrifice = materialDifference < 0; // Material is lost
+
+        // Check if the move leads to a significant improvement in evaluation
+        const isSignificantImprovement = Math.abs(evalScore) > evalThresholds.brilliant;
+
+        // Determine if the move is "Brilliant"
+        if (isBestMove && isSacrifice && isSignificantImprovement) {
             moveCategory = "Brilliant Move";
             moveColor = "cyan";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.great && playerMove !== bestMove) {
+        } else if (isBestMove && Math.abs(evalScore) > evalThresholds.great) {
             moveCategory = "Great Move";
             moveColor = "indigo";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.inaccuracy && Math.abs(evalScore) < evalThresholds.mistake) {
+        } else if (isBestMove) {
+            moveCategory = "Best Move";
+            moveColor = "green";
+        } else if (Math.abs(evalScore) <= evalThresholds.book) {
+            moveCategory = "Book Move";
+            moveColor = "gray";
+        } else if (Math.abs(evalScore) > evalThresholds.inaccuracy && Math.abs(evalScore) < evalThresholds.mistake) {
             moveCategory = "Inaccuracy";
             moveColor = "#FFCE1B";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.mistake && Math.abs(evalScore) < evalThresholds.blunder) {
+        } else if (Math.abs(evalScore) > evalThresholds.mistake && Math.abs(evalScore) < evalThresholds.blunder) {
             moveCategory = "Mistake";
             moveColor = "orange";
-        } 
-        else if (Math.abs(evalScore) > evalThresholds.blunder) {
+        } else if (Math.abs(evalScore) > evalThresholds.blunder) {
             moveCategory = "Blunder";
             moveColor = "red";
         }
@@ -413,6 +487,22 @@
         console.error("Error analyzing position:", error);
         document.getElementById("move-analysis").innerText = "Error fetching move data";
     }
+}
+
+// Helper function to calculate material difference
+function calculateMaterial(fen) {
+    const pieceValues = {
+        p: 1, n: 3, b: 3, r: 5, q: 9, k: 0, // Pawn, Knight, Bishop, Rook, Queen, King
+        P: -1, N: -3, B: -3, R: -5, Q: -9, K: 0
+    };
+
+    let material = 0;
+    for (let char of fen.split(" ")[0]) {
+        if (pieceValues[char]) {
+            material += pieceValues[char];
+        }
+    }
+    return material;
 }
 function updateMoveHistory() {
     const moveList = document.getElementById("move-list");
@@ -432,48 +522,74 @@ function play() {
     game.reset();
     board.position('start');
 
-    function onDragStart(source, piece, position, orientation) {
-        if (game.game_over()) return false;
-        if (piece.search(/^b/) !== -1) return false;
-    }
-
-    async function makeBestMove() {
-        if (game.game_over() || stopAI) return; // Stop AI if disabled
-
-        const fen = game.fen();
-        const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
-
-        try {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error("Failed to get AI move");
-
-            const data = await response.json();
-            if (data.success && data.bestmove) {
-                const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "e2e4")
-                game.move(bestMove);
-                board.position(game.fen());
-                updateMoveHistory();
-                checkGameStatus();
-            }
-        } catch (error) {
-            console.error("Error making AI move:", error);
-        }
-    }
-
     function onDrop(source, target) {
         if (stopAI) return; // Allow manual play without AI interference
 
         var move = game.move({ from: source, to: target, promotion: 'q' });
 
-        if (move === null) return 'snapback';
+        if (move === null) return 'snapback'; // Invalid move
 
         updateMoveHistory();
         checkGameStatus();
 
-        if (!game.game_over()) {
-            setTimeout(makeBestMove, 500); // AI move with delay
+        // AI moves only if it's Black's turn
+        if (!game.game_over() && game.turn() === 'b') {
+            setTimeout(makeBestMove, 500); 
         }
     }
+
+    async function makeBestMove() {
+    if (game.game_over() || stopAI || game.turn() === 'w') return; // Stop AI if disabled or not its turn
+
+    const fen = game.fen();
+    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to get AI move");
+
+        const data = await response.json();
+        console.log("Stockfish API Response:", data); // 🔥 Log AI move response
+
+        if (data.success && data.bestmove) {
+            const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "e2e4")
+            console.log("AI Best Move:", bestMove); // 🔥 Log AI chosen move
+
+            // Convert UCI move to an object Chess.js understands
+            const moveObj = {
+                from: bestMove.substring(0, 2),
+                to: bestMove.substring(2, 4),
+                promotion: "q" // Assume queen promotion by default
+            };
+
+            const move = game.move(moveObj);
+            if (!move) {
+                console.error("AI move was invalid:", moveObj);
+                return;
+            }
+
+            console.log("Move successfully made:", move); // 🔥 Log successful AI move
+
+            board.position(game.fen()); // ✅ Update board
+            updateMoveHistory();
+            checkGameStatus();
+
+            // ✅ Now highlight AI's move
+            highlightMove(move.from, move.to);
+
+            // AI moves again if it's still Black's turn (AI vs AI)
+            if (!game.game_over() && game.turn() === 'b') {
+                setTimeout(makeBestMove, 500);
+            }
+        } else {
+            console.error("Stockfish did not return a valid move.");
+        }
+    } catch (error) {
+        console.error("Error making AI move:", error);
+    }
+}
+
+
 
     function onSnapEnd() {
         board.position(game.fen());
@@ -492,25 +608,59 @@ function play() {
         }
     }
 
-    var config = {
+    function onMouseoverSquare(square) {
+        if (game.game_over()) return;
+        const moves = game.moves({ square: square, verbose: true });
+        if (moves.length === 0) return;
+
+        highlightSquare(square, "rgba(255, 255, 0, 0.6)"); // Highlight selected square
+        moves.forEach(move => highlightSquare(move.to, "rgba(0, 255, 0, 0.6)")); // Highlight legal moves
+    }
+
+    function onMouseoutSquare() {
+        removeHighlighting();
+    }
+
+    function highlightMove(from, to) {
+        removeHighlighting();
+        highlightSquare(from, "rgba(255, 255, 0, 0.6)"); // Yellow for AI's from-square
+        highlightSquare(to, "rgba(0, 255, 0, 0.6)"); // Green for AI's to-square
+    }
+
+    
+    function highlightSquare(square, color) {
+            const squareElement = document.querySelector(`.square-${square}`);
+            if (squareElement) {
+                squareElement.style.backgroundColor = color;
+            }
+        }
+
+        function removeHighlighting() {
+            document.querySelectorAll("#board .square-55d63").forEach(square => {
+                square.style.backgroundColor = "";
+            });
+        }
+
+    // Initialize Chessboard with correct event handlers
+    board = Chessboard('board', {
         draggable: true,
         position: 'start',
         pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-        onDragStart: onDragStart,
         onDrop: onDrop,
-        onSnapEnd: onSnapEnd
-    };
-    board = Chessboard('board', config);
-
-    document.getElementById("restartBtn").addEventListener("click", () => {
-        game.reset();
-        board.position('start');
-        document.getElementById("gameStatus").innerText = "";
-        updateMoveHistory();
+        onSnapEnd: onSnapEnd,
+        onMouseoverSquare: onMouseoverSquare,
+        onMouseoutSquare: onMouseoutSquare
     });
 
     updateMoveHistory();
+
+    // AI moves first if playing as Black
+    if (game.turn() === 'b') {
+        setTimeout(makeBestMove, 500);
+    }
 }
+
+
 
 // Stop AI function
 function stopAIPlay() {
