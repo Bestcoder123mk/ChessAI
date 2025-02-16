@@ -137,7 +137,9 @@
         .square-55d63 {
     transition: background-color 0.2s ease-in-out;
     }
-
+    .highlight {
+        background-color: #00fff2; 
+    }
     </style>
 </head>
 <body>
@@ -190,22 +192,56 @@
         }
 
         function onDrop(source, target) {
-    let move = game.move({ from: source, to: target, promotion: 'q' });
+            let move = game.move({ from: source, to: target, promotion: promotionPiece });
     if (move === null) return 'snapback';
+    if (move.promotion) {
+        handlePromotion();  // Show the promotion options UI
+    }
     updateMoveHistory();
     checkGameStatus();
     board.position(game.fen()); //update the board after the move.
     if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); // Only make the AI move if stopAI is false.
-}
 
+    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+}
+let promotionPiece = 'q'; // Default to Queen
+function choosePromotion(piece) {
+    promotionPiece = piece;  // Set the promotion piece
+    document.getElementById('promotion-options').style.display = 'none'; // Hide the promotion options
+    // Now make the move with the chosen promotion piece
+    const move = game.move({ from: selectedSquare, to: lastSquare, promotion: promotionPiece });
+    board.position(game.fen());  // Update the board position
+}
+function handlePromotion() {
+    // Display promotion options when a pawn reaches the last rank
+    const promotionDiv = document.getElementById('promotion-options');
+    promotionDiv.style.display = 'block'; // Show the promotion options UI
+}
+function renderPromotionUI() {
+    const promotionHTML = `
+        <div id="promotion-options" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid black;">
+            <button onclick="choosePromotion('q')">Queen</button>
+            <button onclick="choosePromotion('r')">Rook</button>
+            <button onclick="choosePromotion('b')">Bishop</button>
+            <button onclick="choosePromotion('n')">Knight</button>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', promotionHTML);
+}
+renderPromotionUI();
 function onSquareClick(square) {
     if (selectedSquare) {
-        let move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+        const move = game.move({ from: selectedSquare, to: square, promotion: promotionPiece });
         if (move === null) {
             selectedSquare = null;
             removeHighlighting();
             return;
+        } else {
+            if (move.promotion) {
+                handlePromotion();  
+            }
         }
+
         board.position(game.fen());
         updateMoveHistory();
         removeHighlighting();
@@ -244,7 +280,7 @@ function onSquareClick(square) {
             document.querySelectorAll("#board .square-55d63").forEach(square => {
                 square.style.backgroundColor = "";
             });
-        }
+            }
 
         document.getElementById("startBtn").addEventListener("click", () => {
             game.reset();
@@ -268,31 +304,38 @@ function onSquareClick(square) {
             updateMoveHistory();
         });
 
-        async function analyzeWithStockfish() {
-            const fen = game.fen();
-            const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Failed to get analysis");
-                const data = await response.json();
-                if (data.success && data.bestmove) {
-                    const bestMove = data.bestmove.split(" ")[1];
-                    if (bestMove.length === 4) highlightMove(bestMove.substring(0, 2), bestMove.substring(2, 4));
-                    document.getElementById("best-move").innerText = `Best Move: ${bestMove} (Eval: ${data.evaluation})`;
-                } else {
-                    document.getElementById("best-move").innerText = "Best Move: No data available";
-                }
-            } catch (error) {
-                console.error("Error analyzing position:", error);
-                document.getElementById("best-move").innerText = "Best Move: Error fetching move";
+        
+async function analyzeWithStockfish() {
+    const fen = game.fen();
+    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to get analysis");
+        const data = await response.json();
+        if (data.success && data.bestmove) {
+            const bestMove = data.bestmove.split(" ")[1];
+            if (bestMove.length === 4) {
+                // Highlight the best move
+                highlightMove(bestMove.substring(0, 2), bestMove.substring(2, 4));
             }
+            document.getElementById("best-move").innerText = `Best Move: ${bestMove} (Eval: ${data.evaluation})`;
+        } else {
+            document.getElementById("best-move").innerText = "Best Move: No data available";
         }
+    } catch (error) {
+        console.error("Error analyzing position:", error);
+        document.getElementById("best-move").innerText = "Best Move: Error fetching move";
+    }
+}
 
-        function highlightMove(from, to) {
-            document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
-            document.querySelector(`.square-${from}`).classList.add('highlight');
-            document.querySelector(`.square-${to}`).classList.add('highlight');
-        }
+
+function highlightMove(from, to) {
+    const fromSquare = document.querySelector(`.square-${from}`);
+    const toSquare = document.querySelector(`.square-${to}`);
+    
+    if (fromSquare) fromSquare.classList.add('highlight');
+    if (toSquare) toSquare.classList.add('highlight');
+    }
 
         async function fetchPlayerData() {
             const username = document.getElementById("username").value.trim();
@@ -325,7 +368,7 @@ function onSquareClick(square) {
                 if (!gameResponse.ok) throw new Error("Games not found");
                 const gameData = await gameResponse.json();
                 const select = document.getElementById("game-history");
-                select.innerHTML = '<option value="">Select a game</option>';
+                select.innerHTML = '<option value=""> Select a game to analyze </option>';
                 gameData.games.forEach(game => {
                     if (game.pgn) {
                         const option = document.createElement("option");
