@@ -358,25 +358,12 @@ function play() {
         if (game.game_over()) return false;
         if (piece.search(/^b/) !== -1) return false;
     }
-    function makeRandomMove() {
-        if (game.game_over()) return; // Stop if game is over
-
-        var possibleMoves = game.moves();
-        if (possibleMoves.length === 0) return;
-
-        var randomIdx = Math.floor(Math.random() * possibleMoves.length);
-        game.move(possibleMoves[randomIdx]);
-        board.position(game.fen());
-
-        checkGameStatus();  
-    }
     function makeBestMove() {
-    if (game.game_over()) return; // Stop if game is over
+    if (game.game_over()) return;
 
-    let stockfish = new Worker("stockfish.js"); // Initialize Stockfish engine
-
-    stockfish.postMessage("position fen " + game.fen()); // Set the board position
-    stockfish.postMessage("go depth 15"); // Ask for the best move with a depth of 15
+    let stockfish = new Worker("stockfish.js");
+    stockfish.postMessage("position fen " + game.fen()); 
+    stockfish.postMessage("go depth 15"); 
 
     stockfish.onmessage = function (event) {
         let message = event.data;
@@ -396,13 +383,9 @@ function play() {
     function onDrop(source, target) {
         var move = game.move({ from: source, to: target, promotion: 'q' });
         if (move === null) return 'snapback';
-
         checkGameStatus();  
-
         if (!game.game_over()) {
-        var pickBestMove = Math.random() < 0.5; 
-
-        window.setTimeout(pickBestMove ? makeBestMove : makeRandomMove, 250);
+        window.setTimeout(makeBestMove, 250);
     }
 }
 
