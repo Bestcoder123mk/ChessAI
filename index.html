@@ -12,99 +12,109 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
     
     <style>
-body {
-    font-family: 'Poppins', sans-serif;
-    text-align: center;
-    background: linear-gradient(135deg, #e0eafc, #cfdef3);
-    color: #333;
-    padding: 20px;
-}
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            background: linear-gradient(135deg, #e0eafc, #cfdef3);
+            color: #333;
+            padding: 20px;
+        }
 
-h2 {
-    color: #007BFF;
-    font-size: 24px;
-    margin-bottom: 10px;
-}
+        h2 {
+            color: #007BFF;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
 
-#board {
-    width: 400px;
-    height: 400px;
-    margin: 20px auto;
-    border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    background-color: #fff;
-    padding: 10px;
-}
+        #board {
+            width: 400px;
+            height: 400px;
+            margin: 20px auto;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            background-color: #fff;
+            padding: 10px;
+        }
 
-button {
-    padding: 12px 15px;
-    margin: 8px;
-    border: none;
-    background: linear-gradient(90deg, #007BFF, #0056b3);
-    color: white;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: all 0.3s ease-in-out;
-}
+        button {
+            padding: 12px 15px;
+            margin: 8px;
+            border: none;
+            background: linear-gradient(90deg, #007BFF, #0056b3);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s ease-in-out;
+        }
 
-button:hover {
-    background: linear-gradient(90deg, #0056b3, #004494);
-    transform: scale(1.05);
-}
+        button:hover {
+            background: linear-gradient(90deg, #0056b3, #004494);
+            transform: scale(1.05);
+        }
 
-button:active {
-    transform: scale(0.95);
-}
+        button:active {
+            transform: scale(0.95);
+        }
 
-input, select {
-    padding: 10px;
-    margin: 8px;
-    border-radius: 6px;
-    border: 1px solid #bbb;
-    font-size: 14px;
-    width: 250px;
-    text-align: center;
-}
+        input, select {
+            padding: 10px;
+            margin: 8px;
+            border-radius: 6px;
+            border: 1px solid #bbb;
+            font-size: 14px;
+            width: 250px;
+            text-align: center;
+        }
 
-#gameStatus {
-    font-size: 18px;
-    font-weight: bold;
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 6px;
-}
+        #gameStatus {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+        }
 
-#gameStatus:empty {
-    display: none;
-}
+        #gameStatus:empty {
+            display: none;
+        }
 
-#info {
-    margin-top: 20px;
-    padding: 15px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    display: inline-block;
-}
+        #info {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: inline-block;
+        }
 
-@media (max-width: 600px) {
-    #board {
-        width: 300px;
-        height: 300px;
-    }
+        #move-history {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            display: inline-block;
+            max-height: 200px;
+            overflow-y: auto;
+        }
 
-    button {
-        font-size: 14px;
-        padding: 10px;
-    }
+        @media (max-width: 600px) {
+            #board {
+                width: 300px;
+                height: 300px;
+            }
 
-    input, select {
-        width: 200px;
-    }
-}
-    
+            button {
+                font-size: 14px;
+                padding: 10px;
+            }
+
+            input, select {
+                width: 200px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -128,6 +138,10 @@ input, select {
         </select>
         <button id="analyzeGame">Analyze Game</button>
     </div>
+    <div id="move-history">
+        <h3>Move History</h3>
+        <ul id="move-list"></ul>
+    </div>
 
     <script>
         let board, game, moves, currentMoveIndex;
@@ -137,75 +151,73 @@ input, select {
             board = Chessboard('board', {
                 draggable: true,
                 position: 'start',
-                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+                onDrop: onDrop,
+                onSnapEnd: onSnapEnd
             });
         });
 
         document.getElementById("startBtn").addEventListener("click", () => {
             game.reset();
             board.position('start');
+            updateMoveHistory();
         });
         
         document.getElementById("clearBtn").addEventListener("click", () => {
             game.clear();
             board.position('empty');
+            updateMoveHistory();
         });
 
         document.getElementById("bestMoveBtn").addEventListener("click", analyzeWithStockfish);
         document.getElementById("gamestartBtn").addEventListener("click", play);
         
         async function analyzeWithStockfish() {
-    const fen = game.fen();
-    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
+            const fen = game.fen();
+            const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
 
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to get analysis");
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to get analysis");
 
-        const data = await response.json();
-        if (data.success && data.bestmove) {
-            const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "b7b6")
+                const data = await response.json();
+                if (data.success && data.bestmove) {
+                    const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "b7b6")
 
-            if (bestMove.length === 4) {
-                const fromSquare = bestMove.substring(0, 2);
-                const toSquare = bestMove.substring(2, 4);
+                    if (bestMove.length === 4) {
+                        const fromSquare = bestMove.substring(0, 2);
+                        const toSquare = bestMove.substring(2, 4);
 
-                // Highlight squares on the board
-                highlightMove(fromSquare, toSquare);
+                        // Highlight squares on the board
+                        highlightMove(fromSquare, toSquare);
+                    }
+
+                    document.getElementById("best-move").innerText = `Best Move: ${bestMove} (Eval: ${data.evaluation})`;
+                } else {
+                    document.getElementById("best-move").innerText = "Best Move: No data available";
+                }
+            } catch (error) {
+                console.error("Error analyzing position:", error);
+                document.getElementById("best-move").innerText = "Best Move: Error fetching move";
             }
-
-            document.getElementById("best-move").innerText = `Best Move: ${bestMove} (Eval: ${data.evaluation})`;
-        } else {
-            document.getElementById("best-move").innerText = "Best Move: No data available";
         }
-    } catch (error) {
-        console.error("Error analyzing position:", error);
-        document.getElementById("best-move").innerText = "Best Move: Error fetching move";
-    }
-}
 
-// Function to highlight the best move
-function highlightMove(from, to) {
-    // Remove previous highlights
-    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+        function highlightMove(from, to) {
+            // Remove previous highlights
+            document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
 
-    // Add new highlights
-    document.querySelector(`.square-${from}`).classList.add('highlight');
-    document.querySelector(`.square-${to}`).classList.add('highlight');
-}
+            // Add new highlights
+            document.querySelector(`.square-${from}`).classList.add('highlight');
+            document.querySelector(`.square-${to}`).classList.add('highlight');
+        }
 
-// Add CSS styles for highlight effect
-const style = document.createElement('style');
-style.innerHTML = `
-    .highlight {
-        background-color: rgba(255, 215, 0, 0.7) !important; /* Gold color */
-    }
-`;
-document.head.appendChild(style);
-
-
-
-
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .highlight {
+                background-color: rgba(255, 215, 0, 0.7) !important; /* Gold color */
+            }
+        `;
+        document.head.appendChild(style);
 
         async function fetchPlayerData() {
             const username = document.getElementById("username").value.trim();
@@ -257,226 +269,231 @@ document.head.appendChild(style);
                 console.error("Error fetching games:", error);
             }
         }
+
         document.getElementById("analyzeGame").addEventListener("click", analyzeSelectedGame);
 
-    function analyzeSelectedGame() {
-        const selectedGamePGN = document.getElementById("game-history").value;
-        if (!selectedGamePGN) {
-            alert("Please select a game to analyze!");
-            return;
+        function analyzeSelectedGame() {
+            const selectedGamePGN = document.getElementById("game-history").value;
+            if (!selectedGamePGN) {
+                alert("Please select a game to analyze!");
+                return;
+            }
+
+            game.load_pgn(selectedGamePGN);
+            moves = game.history({ verbose: true });
+            currentMoveIndex = 0;
+            board.position(game.fen());
+
+            document.getElementById("best-move").innerText = "Best Move: -";
+            createNavigationButtons();
         }
 
-        game.load_pgn(selectedGamePGN);
-        moves = game.history({ verbose: true });
-        currentMoveIndex = 0;
-        board.position(game.fen());
+        function createNavigationButtons() {
+            let controls = document.getElementById("info");
 
-        document.getElementById("best-move").innerText = "Best Move: -";
-        createNavigationButtons();
-    }
+            if (!document.getElementById("prevMoveBtn")) {
+                let prevBtn = document.createElement("button");
+                prevBtn.id = "prevMoveBtn";
+                prevBtn.innerText = "Previous Move";
+                prevBtn.onclick = () => navigateMoves(-1);
+                controls.appendChild(prevBtn);
+            }
 
-    function createNavigationButtons() {
-        let controls = document.getElementById("info");
-
-        if (!document.getElementById("prevMoveBtn")) {
-            let prevBtn = document.createElement("button");
-            prevBtn.id = "prevMoveBtn";
-            prevBtn.innerText = "Previous Move";
-            prevBtn.onclick = () => navigateMoves(-1);
-            controls.appendChild(prevBtn);
+            if (!document.getElementById("nextMoveBtn")) {
+                let nextBtn = document.createElement("button");
+                nextBtn.id = "nextMoveBtn";
+                nextBtn.innerText = "Next Move";
+                nextBtn.onclick = () => navigateMoves(1);
+                controls.appendChild(nextBtn);
+            }
         }
 
-        if (!document.getElementById("nextMoveBtn")) {
-            let nextBtn = document.createElement("button");
-            nextBtn.id = "nextMoveBtn";
-            nextBtn.innerText = "Next Move";
-            nextBtn.onclick = () => navigateMoves(1);
-            controls.appendChild(nextBtn);
+        async function analyzeCurrentMove() {
+            const fen = game.fen();
+            const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to get analysis");
+                
+                const data = await response.json();
+                if (!data.success || !data.bestmove) {
+                    document.getElementById("move-analysis").innerText = "No analysis available";
+                    return;
+                }
+
+                let bestMove = data.bestmove.trim().split(" ")[0] || "N/A";
+                let evalScore = data.evaluation ? parseFloat(data.evaluation) : 0;
+
+                const playerMove = moves[currentMoveIndex - 1]?.san || "None";
+
+                let moveCategory = "Good Move", moveColor = "black";
+                if (playerMove === bestMove) {
+                    moveCategory = "Best Move"; moveColor = "green";
+                } else if (evalScore >= 2.5) {
+                    moveCategory = "Brilliant Move"; moveColor = "cyan";
+                } else if (evalScore >= 1.5) {
+                    moveCategory = "Great Move"; moveColor = "indigo";
+                } else if (evalScore >= 0.8) {
+                    moveCategory = "Inaccuracy"; moveColor = "#FFCE1B";
+                } else if (evalScore >= 3.0) {
+                    moveCategory = "Blunder"; moveColor = "red";
+                }
+
+                document.getElementById("move-analysis").innerHTML = 
+                    `<strong>${moveCategory}:</strong> ${playerMove} <br>
+                     Stockfish Suggestion: <strong>${bestMove}</strong> <br> 
+                     Eval: <strong>${evalScore}</strong>`;
+                document.getElementById("move-analysis").style.color = moveColor;
+            } catch (error) {
+                console.error("Error analyzing move:", error);
+                document.getElementById("move-analysis").innerText = "Error fetching move data";
+            }
         }
-    }
 
-    async function analyzeCurrentMove() {
-    const fen = game.fen();
-    const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=15`;
-
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to get analysis");
-        
-        const data = await response.json();
-        if (!data.success || !data.bestmove) {
-            document.getElementById("move-analysis").innerText = "No analysis available";
-            return;
+        function play() { 
+            game.reset();
+            board.position('start');
+            updateMoveHistory();
         }
 
-        let bestMove = data.bestmove.trim().split(" ")[0] || "N/A";
-        let evalScore = data.evaluation ? parseFloat(data.evaluation) : 0;
-
-        const playerMove = moves[currentMoveIndex - 1]?.san || "None";
-
-        let moveCategory = "Good Move", moveColor = "black";
-        if (playerMove === bestMove) {
-            moveCategory = "Best Move"; moveColor = "green";
-        } else if (evalScore >= 2.5) {
-            moveCategory = "Brilliant Move"; moveColor = "cyan";
-        } else if (evalScore >= 1.5) {
-            moveCategory = "Great Move"; moveColor = "indigo";
-        } else if (evalScore >= 0.8) {
-            moveCategory = "Inaccuracy"; moveColor = "#FFCE1B";
-        } else if (evalScore >= 3.0) {
-            moveCategory = "Blunder"; moveColor = "red";
+        function removeGreySquares() {
+            $('#board .square-55d63').css('background', '');
         }
 
-        document.getElementById("move-analysis").innerHTML = 
-            `<strong>${moveCategory}:</strong> ${playerMove} <br>
-             Stockfish Suggestion: <strong>${bestMove}</strong> <br> 
-             Eval: <strong>${evalScore}</strong>`;
-        document.getElementById("move-analysis").style.color = moveColor;
-    } catch (error) {
-        console.error("Error analyzing move:", error);
-        document.getElementById("move-analysis").innerText = "Error fetching move data";
-    }
-}
+        function greySquare(square) {
+            var $square = $('#board .square-' + square);
 
-function play() { 
-    if (!board || !game) {
-        game = new Chess();
-        board = Chessboard('board', {
-            draggable: true,
-            position: 'start',
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd
+            var background = whiteSquareGrey;
+            if ($square.hasClass('black-3c85d')) {
+                background = blackSquareGrey;
+            }
+
+            $square.css('background', background);
+        }
+
+        function onDragStart(source, piece) {
+            if (game.game_over()) return false;
+
+            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                return false;
+            }
+        }
+
+        function onDrop(source, target) {
+            removeGreySquares();
+
+            var move = game.move({
+                from: source,
+                to: target,
+                promotion: 'q' // Promote to a queen by default
+            });
+
+            if (move === null) return 'snapback';
+
+            board.position(game.fen());
+            updateMoveHistory();
+            makeAIMove();
+            checkGameStatus();
+        }
+
+        function onMouseoverSquare(square) {
+            var moves = game.moves({
+                square: square,
+                verbose: true
+            });
+
+            if (moves.length === 0) return;
+
+            greySquare(square);
+
+            for (var i = 0; i < moves.length; i++) {
+                greySquare(moves[i].to);
+            }
+        }
+
+        function onMouseoutSquare(square) {
+            removeGreySquares();
+        }
+
+        function onSnapEnd() {
+            board.position(game.fen());
+        }
+
+        async function makeAIMove() {
+            if (game.game_over()) return; // Stop if game is over
+
+            const fen = game.fen();
+            const url = `https://stockfish.online/api/s/v2.php?fen=${encodeURIComponent(fen)}&depth=10`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to get AI move");
+
+                const data = await response.json();
+                if (data.success && data.bestmove) {
+                    const bestMove = data.bestmove.split(" ")[1]; // Extract best move (e.g., "b7b6")
+                    game.move(bestMove);
+                    board.position(game.fen());
+                    updateMoveHistory();
+                    checkGameStatus();
+                }
+            } catch (error) {
+                console.error("Error making AI move:", error);
+            }
+        }
+
+        function checkGameStatus() {
+            const statusElement = document.getElementById("gameStatus");
+
+            if (game.in_checkmate()) {
+                let winner = game.turn() === 'w' ? 'Black' : 'White';
+                statusElement.innerText = `Checkmate! ${winner} Wins!`;
+            } else if (game.in_draw()) {
+                statusElement.innerText = "It's a Draw!";
+            } else if (game.in_check()) {
+                statusElement.innerText = "Check!";
+            } else {
+                statusElement.innerText = ""; // Clear status if the game continues
+            }
+        }
+
+        function updateMoveHistory() {
+            const moveList = document.getElementById("move-list");
+            moveList.innerHTML = ""; // Clear previous moves
+
+            const history = game.history();
+            history.forEach((move, index) => {
+                const li = document.createElement("li");
+                li.textContent = `${index + 1}. ${move}`;
+                moveList.appendChild(li);
+            });
+        }
+
+        document.getElementById("restartBtn").addEventListener("click", () => {
+            game.reset();
+            board.position('start');
+            document.getElementById("gameStatus").innerText = ""; // Clear status message
+            updateMoveHistory();
         });
-    } else {
-        game.reset();
-        board.position('start');
-    }
-    function removeGreySquares() {
-        $('#board .square-55d63').css('background', '');
-    }
 
-    function greySquare(square) {
-        var $square = $('#board .square-' + square);
+        function navigateMoves(direction) {
+            currentMoveIndex += direction;
 
-        var background = whiteSquareGrey;
-        if ($square.hasClass('black-3c85d')) {
-            background = blackSquareGrey;
+            if (currentMoveIndex < 0) currentMoveIndex = 0;
+            if (currentMoveIndex > moves.length) currentMoveIndex = moves.length;
+
+            game.reset();
+            for (let i = 0; i < currentMoveIndex; i++) {
+                game.move(moves[i].san);
+            }
+
+            board.position(game.fen());
+
+            // Analyze move with Stockfish
+            analyzeCurrentMove();
         }
-
-        $square.css('background', background);
-    }
-
-    function onDragStart(source, piece) {
-        if (game.game_over()) return false;
-
-        if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
-            (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
-            return false;
-        }
-    }
-
-    function onDrop(source, target) {
-        removeGreySquares();
-
-        var move = game.move({
-            from: source,
-            to: target,
-            promotion: 'q' // Promote to a queen by default
-        });
-
-        if (move === null) return 'snapback';
-    }
-
-    function onMouseoverSquare(square) {
-        var moves = game.moves({
-            square: square,
-            verbose: true
-        });
-
-        if (moves.length === 0) return;
-
-        greySquare(square);
-
-        for (var i = 0; i < moves.length; i++) {
-            greySquare(moves[i].to);
-        }
-    }
-
-    function onMouseoutSquare(square) {
-        removeGreySquares();
-    }
-
-    function onSnapEnd() {
-        board.position(game.fen());
-    }
-
-    var config = {
-        draggable: true,
-        position: 'start',
-        onDragStart: onDragStart,
-        onDrop: onDrop,
-        onMouseoutSquare: onMouseoutSquare,
-        onMouseoverSquare: onMouseoverSquare,
-        onSnapEnd: onSnapEnd
-    };
-}
-    document.addEventListener("DOMContentLoaded", () => {
-        board = Chessboard('board', config);
-    });
-    function makeRandomMove() {
-        if (game.game_over()) return; // Stop if game is over
-
-        var possibleMoves = game.moves();
-        if (possibleMoves.length === 0) return;
-
-        var randomIdx = Math.floor(Math.random() * possibleMoves.length);
-        game.move(possibleMoves[randomIdx]);
-        board.position(game.fen());
-
-        checkGameStatus();  // ✅ Check after AI move
-    }
-    function checkGameStatus() {
-        const statusElement = document.getElementById("gameStatus");
-
-        if (game.in_checkmate()) {
-            let winner = game.turn() === 'w' ? 'Black' : 'White';
-            statusElement.innerText = `Checkmate! ${winner} Wins!`;
-        } else if (game.in_draw()) {
-            statusElement.innerText = "It's a Draw!";
-        } else {
-            statusElement.innerText = ""; // Clear status if the game continues
-        }
-    }
-    board = Chessboard('board', config);
-
-    document.getElementById("restartBtn").addEventListener("click", () => {
-        game.reset();
-        board.position('start');
-        document.getElementById("gameStatus").innerText = ""; // Clear status message
-    });
-}
-
-    
-
-// Modify `navigateMoves()` to analyze each move
-function navigateMoves(direction) {
-    currentMoveIndex += direction;
-
-    if (currentMoveIndex < 0) currentMoveIndex = 0;
-    if (currentMoveIndex > moves.length) currentMoveIndex = moves.length;
-
-    game.reset();
-    for (let i = 0; i < currentMoveIndex; i++) {
-        game.move(moves[i].san);
-    }
-
-    board.position(game.fen());
-
-    // Analyze move with Stockfish
-    analyzeCurrentMove();
-}
-
     </script>
 </body>
 </html>
