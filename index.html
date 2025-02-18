@@ -204,7 +204,7 @@
     board.position(game.fen()); 
 document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
 }
-let promotionPiece = ''; 
+let promotionPiece = 'q'; 
 function choosePromotion(piece) {
     promotionPiece = piece;  
     document.getElementById('promotion-options').style.display = 'none'; 
