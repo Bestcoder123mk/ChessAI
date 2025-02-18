@@ -203,31 +203,44 @@
 
     document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
 }
-let promotionPiece = 'q';
+        function renderPromotionUI() {
+    const promotionHTML = `
+        <div id="promotion-options" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid black;">
+            <button id="q" onclick="choosePromotion('q')">Queen</button>
+            <button id="r" onclick="choosePromotion('r')">Rook</button>
+            <button id="b" onclick="choosePromotion('b')">Bishop</button>
+            <button id="n" onclick="choosePromotion('n')">Knight</button>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', promotionHTML);
+}
+let promotionPiece = ' ';
 function choosePromotion(piece) {
     promotionPiece = piece;  
+        renderPromotionUI();
     document.getElementById('promotion-options').style.display = 'none'; 
+    if document.getElementById('q') click() {
+        promotionPiece = 'q'
+    }
+        if document.getElementById('r') click() {
+        promotionPiece = 'r'
+    }
+        if document.getElementById('b') click() {
+        promotionPiece = 'b'
+    }
+        if document.getElementById('n') click() {
+        promotionPiece = 'n'
+    }
 
     const move = game.move({ from: selectedSquare, to: lastSquare, promotion: promotionPiece });
     board.position(game.fen());  
 }
 function handlePromotion() {
-
     const promotionDiv = document.getElementById('promotion-options');
     promotionDiv.style.display = 'block'; 
 }
-function renderPromotionUI() {
-    const promotionHTML = `
-        <div id="promotion-options" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid black;">
-            <button onclick="choosePromotion('q')">Queen</button>
-            <button onclick="choosePromotion('r')">Rook</button>
-            <button onclick="choosePromotion('b')">Bishop</button>
-            <button onclick="choosePromotion('n')">Knight</button>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', promotionHTML);
-}
-renderPromotionUI();
+
+
 function onSquareClick(square) {
     if (selectedSquare) {
         const move = game.move({ from: selectedSquare, to: square, promotion: promotionPiece });
