@@ -29,7 +29,7 @@
     align-items: flex-start;
     gap: 20px;
     margin: 20px auto;
-    max-width: 1000px; /* Adjusted for better spacing */
+    max-width: 1000px; 
 }
 
 #info {
@@ -167,7 +167,7 @@
     <button id="restartBtn">Restart Game</button>
     <button id="startBtn">Start Position</button>
     <button id="clearBtn">Clear Board</button>
-    <button id="stopAIBtn">Stop AI</button>
+    <button id="stopAIBtn">Stop Playing</button>
     <footer><hr>Made by Anirudh MK ©</footer>
     <script>
         let board, game, moves = [], currentMoveIndex = 0, selectedSquare, stopAI = false;
@@ -194,27 +194,27 @@
             let move = game.move({ from: source, to: target, promotion: promotionPiece });
     if (move === null) return 'snapback';
     if (move.promotion) {
-        handlePromotion();  // Show the promotion options UI
+        handlePromotion(); 
     }
     updateMoveHistory();
     checkGameStatus();
-    board.position(game.fen()); //update the board after the move.
-    if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); // Only make the AI move if stopAI is false.
+    board.position(game.fen()); 
+    if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); 
 
     document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
 }
-let promotionPiece = 'q'; // Default to Queen
+let promotionPiece = 'q';
 function choosePromotion(piece) {
-    promotionPiece = piece;  // Set the promotion piece
-    document.getElementById('promotion-options').style.display = 'none'; // Hide the promotion options
-    // Now make the move with the chosen promotion piece
+    promotionPiece = piece;  
+    document.getElementById('promotion-options').style.display = 'none'; 
+
     const move = game.move({ from: selectedSquare, to: lastSquare, promotion: promotionPiece });
-    board.position(game.fen());  // Update the board position
+    board.position(game.fen());  
 }
 function handlePromotion() {
-    // Display promotion options when a pawn reaches the last rank
+
     const promotionDiv = document.getElementById('promotion-options');
-    promotionDiv.style.display = 'block'; // Show the promotion options UI
+    promotionDiv.style.display = 'block'; 
 }
 function renderPromotionUI() {
     const promotionHTML = `
@@ -245,7 +245,7 @@ function onSquareClick(square) {
         updateMoveHistory();
         removeHighlighting();
         selectedSquare = null;
-        if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); // Only make the AI move if stopAI is false.
+        if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); 
     } else {
         if (game.get(square)) {
             selectedSquare = square;
@@ -314,7 +314,6 @@ async function analyzeWithStockfish() {
         if (data.success && data.bestmove) {
             const bestMove = data.bestmove.split(" ")[1];
             if (bestMove.length === 4) {
-                // Highlight the best move
                 highlightMove(bestMove.substring(0, 2), bestMove.substring(2, 4));
             }
             document.getElementById("best-move").innerText = `Best Move: ${bestMove} (Eval: ${data.evaluation})`;
@@ -550,15 +549,16 @@ function highlightMove(from, to) {
             }
         }
 
-        function navigateMoves(direction) {
-            currentMoveIndex += direction;
-            if (currentMoveIndex < 0) currentMoveIndex = 0;
-            if (currentMoveIndex > moves.length) currentMoveIndex = moves.length;
-            game.reset();
-            for (let i = 0; i < currentMoveIndex; i++) game.move(moves[i].san);
-            board.position(game.fen());
-            analyzeCurrentMove();
-        }
+function navigateMoves(direction) {
+    currentMoveIndex += direction;
+    if (currentMoveIndex < 0) currentMoveIndex = 0;
+    if (currentMoveIndex > moves.length) currentMoveIndex = moves.length;
+    game.reset();
+    for (let i = 0; i < currentMoveIndex; i++) game.move(moves[i].san);
+    board.position(game.fen());
+    updateMoveHistory(); 
+    analyzeCurrentMove();
+}
     </script>
 </body>
 </html>
