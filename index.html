@@ -170,94 +170,99 @@
     <button id="stopAIBtn">Stop AI</button>
     <footer><hr>Made by Anirudh MK ©</footer>
     <script>
-        let board, game, moves = [], currentMoveIndex = 0, selectedSquare, stopAI = false;
-
+        let board, game, moves = [], currentMoveIndex = 0,stopAI = false;
         document.addEventListener("DOMContentLoaded", () => {
             game = new Chess();
             initializeBoard();
         });
 
         function initializeBoard() {
-            board = Chessboard('board', {
-                draggable: true,
-                position: 'start',
-                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-                onDrop: onDrop,
-                onSnapEnd: onSnapEnd,
-                onMouseoverSquare: onMouseoverSquare,
-                onMouseoutSquare: onMouseoutSquare,
-                onSquareClick: onSquareClick
-            });
-        }
+    board = Chessboard('board', {
+        draggable: true,
+        position: 'start',
+        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+        onDrop: onDrop,
+        onSnapEnd: onSnapEnd,
+        onMouseoverSquare: onMouseoverSquare,
+        onMouseoutSquare: onMouseoutSquare,
+        onSquareclick: handleTouchMove
+    });
+}
+function onDrop(source, target) {
+    let piece = game.get(source);
 
-        function onDrop(source, target) {
-            let move = game.move({ from: source, to: target, promotion: promotionPiece });
-    if (move === null) return 'snapback';
-    if (move.promotion) {
-        handlePromotion();  // Show the promotion options UI
+    // Ensure piece exists before proceeding
+    if (!piece) return 'snapback';
+
+    let move;
+
+    // Check if the moving piece is a pawn reaching promotion rank
+    if (piece.type === 'p' &&
+        ((piece.color === 'w' && target[1] === '8') || (piece.color === 'b' && target[1] === '1'))) {
+
+        let promotion = prompt("Promote to a Queen (q), Rook (r), Bishop (b) or a Knight (n)?", "q");
+        if (!['q', 'r', 'b', 'n'].includes(promotion)) {
+            promotion = 'q'; // Default to queen if input is invalid
+        }
+ 
+        move = game.move({ from: source, to: target, promotion: promotion });
+
+    } else {
+        move = game.move({ from: source, to: target }); // Regular move
     }
+
+    if (move === null) return 'snapback'; // Invalid move
+
     updateMoveHistory();
     checkGameStatus();
-    board.position(game.fen()); //update the board after the move.
-    if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); // Only make the AI move if stopAI is false.
 
-    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+    // Let AI move if it's black's turn
+    if (!game.game_over() && game.turn() === 'b' && !stopAI) {
+        setTimeout(makeBestMove, 10);
+    }
+
+    return true; // Move successful
 }
-let promotionPiece = 'q'; // Default to Queen
-function choosePromotion(piece) {
-    promotionPiece = piece;  // Set the promotion piece
-    document.getElementById('promotion-options').style.display = 'none'; // Hide the promotion options
-    // Now make the move with the chosen promotion piece
-    const move = game.move({ from: selectedSquare, to: lastSquare, promotion: promotionPiece });
-    board.position(game.fen());  // Update the board position
-}
-function handlePromotion() {
-    // Display promotion options when a pawn reaches the last rank
-    const promotionDiv = document.getElementById('promotion-options');
-    promotionDiv.style.display = 'block'; // Show the promotion options UI
-}
-function renderPromotionUI() {
-    const promotionHTML = `
-        <div id="promotion-options" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 10px; border: 1px solid black;">
-            <button onclick="choosePromotion('q')">Queen</button>
-            <button onclick="choosePromotion('r')">Rook</button>
-            <button onclick="choosePromotion('b')">Bishop</button>
-            <button onclick="choosePromotion('n')">Knight</button>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', promotionHTML);
-}
-renderPromotionUI();
-function onSquareClick(square) {
+let selectedSquare = null;
+function highlightSelectedSquare() {
+    $('.square-55d63').css('background', ''); // Clear previous highlights
     if (selectedSquare) {
-        const move = game.move({ from: selectedSquare, to: square, promotion: promotionPiece });
-        if (move === null) {
-            selectedSquare = null;
-            removeHighlighting();
-            return;
-        } else {
-            if (move.promotion) {
-                handlePromotion();  
-            }
-        }
+        $(`.square-${selectedSquare}`).css('background', 'rgba(255, 255, 0, 0.5)'); // Highlight in yellow
+    }
+}
 
-        board.position(game.fen());
-        updateMoveHistory();
-        removeHighlighting();
-        selectedSquare = null;
-        if (!game.game_over() && game.turn() === 'b' && !stopAI) setTimeout(makeBestMove, 500); // Only make the AI move if stopAI is false.
+function handleTouchMove(square) {
+    if (selectedSquare) {
+        let move = game.move({ from: selectedSquare, to: square, promotion: 'q' });
+
+        if (move) {
+            board.position(game.fen());
+            updateMoveHistory();
+            selectedSquare = null;
+            highlightSelectedSquare(); // Remove highlight
+
+            setTimeout(() => {
+                if (!game.game_over() && game.turn() === 'b' && !stopAI) {
+                    makeBestMove();
+                }
+            }, 250);
+        } else {
+            console.log("Invalid move, try again");
+        }
     } else {
-        if (game.get(square)) {
+        let piece = game.get(square);
+        if (piece && piece.color === game.turn()) {
             selectedSquare = square;
-            highlightSquare(square, "highlight");
-            let moves = game.moves({ square: square, verbose: true });
-            moves.forEach(m => highlightSquare(m.to, "move-highlight"));
+            highlightSelectedSquare(); // Highlight selected piece
         }
     }
 }
-        function onSnapEnd() {
-            board.position(game.fen());
-        }
+
+
+function onSnapEnd() {
+    board.position(game.fen()); // Only update the board position here
+}
+
 
         function onMouseoverSquare(square) {
             const moves = game.moves({ square: square, verbose: true });
@@ -271,15 +276,13 @@ function onSquareClick(square) {
         }
 
         function highlightSquare(square, color) {
-            const squareElement = document.querySelector(`.square-${square}`);
-            if (squareElement) squareElement.style.backgroundColor = color;
-        }
+    $(`#board .square-${square}`).css("background", color);
+}
 
-        function removeHighlighting() {
-            document.querySelectorAll("#board .square-55d63").forEach(square => {
-                square.style.backgroundColor = "";
-            });
-            }
+function removeHighlighting() {
+    $("#board .square-55d63").css("background", "");
+}
+
 
         document.getElementById("startBtn").addEventListener("click", () => {
             game.reset();
@@ -326,15 +329,12 @@ async function analyzeWithStockfish() {
         document.getElementById("best-move").innerText = "Best Move: Error fetching move";
     }
 }
-
-
 function highlightMove(from, to) {
-    const fromSquare = document.querySelector(`.square-${from}`);
-    const toSquare = document.querySelector(`.square-${to}`);
-    
-    if (fromSquare) fromSquare.classList.add('highlight');
-    if (toSquare) toSquare.classList.add('highlight');
-    }
+    highlightSquare(from, "#00fff2"); // Cyan color
+    highlightSquare(to, "#00fff2");
+    setTimeout(removeHighlighting, 1250);
+}
+
 
         async function fetchPlayerData() {
             const username = document.getElementById("username").value.trim();
@@ -473,17 +473,6 @@ function highlightMove(from, to) {
                 console.error("Error analyzing position:", error);
                 document.getElementById("move-analysis").innerText = "Error fetching move data";
             }
-        }
-
-        function calculateMaterial(fen) {
-            const pieceValues = {
-                p: 1, n: 3, b: 3, r: 5, q: 9, k: 0, P: -1, N: -3, B: -3, R: -5, Q: -9, K: 0
-            };
-            let material = 0;
-            for (let char of fen.split(" ")[0]) {
-                if (pieceValues[char]) material += pieceValues[char];
-            }
-            return material;
         }
 
         function updateMoveHistory() {
